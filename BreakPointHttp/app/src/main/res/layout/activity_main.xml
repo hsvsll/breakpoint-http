@@ -33,11 +33,20 @@
         android:text="断点续传" />
 
 
+
+    <TextView
+        android:id="@+id/tvProgressText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_horizontal"
+        android:layout_below="@+id/tvBreakPointHttp"
+        android:layout_marginTop="20dp"
+        android:text="0.00%"
+        />
     <ProgressBar
         android:id="@+id/pbDownLoad"
-        android:layout_marginTop="20dp"
         style="@style/Base.Widget.AppCompat.ProgressBar.Horizontal"
-        android:layout_below="@id/tvBreakPointHttp"
+        android:layout_below="@id/tvProgressText"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:max="100"/>
