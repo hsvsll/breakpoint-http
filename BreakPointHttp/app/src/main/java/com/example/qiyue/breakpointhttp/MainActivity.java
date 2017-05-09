@@ -2,8 +2,11 @@ package com.example.qiyue.breakpointhttp;
 
 import android.Manifest;
 import android.app.Activity;
+import android.content.BroadcastReceiver;
 import android.content.ComponentName;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
@@ -41,6 +44,8 @@ public class MainActivity extends AppCompatActivity {
     private boolean isBindService;
 
     private int mProgressSize;
+
+    private boolean isPermission = false;
 
     private ServiceConnection conn = new ServiceConnection() {
 
@@ -87,15 +92,22 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void initView() {
+        registerBroadcast();
     }
 
     @OnClick({R.id.tvSingleThreadDownload, R.id.tvMoreThreadDownload, R.id.tvBreakPointHttp})
     public void onClick(View v){
+        verifyStoragePermissions(MainActivity.this);
         switch (v.getId()){
             case R.id.tvSingleThreadDownload:
-                verifyStoragePermissions(MainActivity.this);
+                if(isPermission){
+                    bindService();
+                }
                 break;
             case R.id.tvMoreThreadDownload:
+                if(isPermission){
+                    DownLoadIntentService.startSingleThreadDownLoad(MainActivity.this);
+                }
                 break;
             case R.id.tvBreakPointHttp:
                 break;
@@ -105,6 +117,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        unregisterBroadcast();
     }
 
     private static final int REQUEST_EXTERNAL_STORAGE = 1;
@@ -122,7 +135,7 @@ public class MainActivity extends AppCompatActivity {
                     REQUEST_EXTERNAL_STORAGE
             );
         }else {
-            bindService();
+            isPermission = true;
         }
     }
 
@@ -135,8 +148,9 @@ public class MainActivity extends AppCompatActivity {
                 // If request is cancelled, the result arrays are empty.
                 if (grantResults.length > 0
                         && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    bindService();
-                } else {
+                    isPermission = true;
+                }else {
+                    isPermission = false;
                 }
                 return;
             }
@@ -156,5 +170,34 @@ public class MainActivity extends AppCompatActivity {
 //            LogUtil.i(TAG, "存储器内存在老APK，进行删除操作");
 //        }
     }
+
+    /**
+     * 注册广播
+     */
+    private void registerBroadcast() {
+        IntentFilter intentFilter = new IntentFilter();
+        intentFilter.addAction(DownLoadIntentService.BROADCAST_INTENT_FILTER);
+        registerReceiver(receiver, intentFilter);
+    }
+
+    /**
+     * 注销广播
+     */
+    private void unregisterBroadcast() {
+        if (receiver != null) {
+            unregisterReceiver(receiver);
+            receiver = null;
+        }
+    }
+
+
+    private BroadcastReceiver receiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            mProgressSize = intent.getIntExtra(DownLoadIntentService.DOWNLOAD_PROGRESS,0);
+            mProgressText.setText(mProgressSize+"%");
+            mProgressBar.setProgress(mProgressSize);
+        }
+    };
 
 }

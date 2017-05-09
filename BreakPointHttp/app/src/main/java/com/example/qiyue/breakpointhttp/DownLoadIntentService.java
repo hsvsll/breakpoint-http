@@ -1,13 +1,19 @@
 package com.example.qiyue.breakpointhttp;
 
-import android.app.DownloadManager;
 import android.app.IntentService;
-import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
-import android.content.IntentFilter;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.Message;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.net.URLConnection;
 
 /**
  * An {@link IntentService} subclass for handling asynchronous task requests in
@@ -18,16 +24,16 @@ import android.os.Message;
  */
 public class DownLoadIntentService extends IntentService {
     private static final String TAG = DownLoadIntentService.class.getSimpleName();
-    private static final String ACTION_FOO = "com.example.qiyue.breakpointhttp.action.FOO";
-    private static final String ACTION_BAZ = "com.example.qiyue.breakpointhttp.action.BAZ";
 
-    private static final String EXTRA_PARAM1 = "com.example.qiyue.breakpointhttp.extra.PARAM1";
-    private static final String EXTRA_PARAM2 = "com.example.qiyue.breakpointhttp.extra.PARAM2";
-
-
+    public static final String BROADCAST_INTENT_FILTER = "BroadcastIntentFilter";
+    public static final String DOWNLOAD_PROGRESS = "Download_Progress";
+    private int mDownloadSize;
+    private int currSize;
+    private int progress;
     public interface OnProgressListener {
         /**
          * 下载进度
+         *
          * @param fraction 已下载/总大小
          */
         void onProgress(float fraction);
@@ -43,11 +49,8 @@ public class DownLoadIntentService extends IntentService {
      *
      * @see IntentService
      */
-    public static void startSingleThreadDownLoad(Context context, String apkUrl, String downloadPath) {
+    public static void startSingleThreadDownLoad(Context context) {
         Intent intent = new Intent(context, DownLoadIntentService.class);
-        intent.setAction(ACTION_FOO);
-        intent.putExtra(EXTRA_PARAM1, apkUrl);
-        intent.putExtra(EXTRA_PARAM2, downloadPath);
         context.startService(intent);
     }
 
@@ -55,20 +58,23 @@ public class DownLoadIntentService extends IntentService {
         @Override
         public void handleMessage(Message msg) {
             super.handleMessage(msg);
+            if (msg.what == 1) {
+                if (mDownloadSize > 0) {
+                    currSize = (int) msg.obj;
+                    progress = (100 * currSize) / mDownloadSize;
+                    Intent intent = new Intent(BROADCAST_INTENT_FILTER);
+                    intent.putExtra(DOWNLOAD_PROGRESS,progress);
+                    sendBroadcast(intent);
+                }
+            }
         }
     };
-
 
 
     @Override
     protected void onHandleIntent(Intent intent) {
         if (intent != null) {
-            final String action = intent.getAction();
-            if (ACTION_FOO.equals(action)) {
-                final String param1 = intent.getStringExtra(EXTRA_PARAM1);
-                final String param2 = intent.getStringExtra(EXTRA_PARAM2);
-                handleActionFoo(param1);
-            }
+            handleActionFoo();
         }
     }
 
@@ -76,37 +82,56 @@ public class DownLoadIntentService extends IntentService {
      * Handle action Foo in the provided background thread with the provided
      * parameters.
      */
-    private void handleActionFoo(String apkUrl) {
+    private void handleActionFoo() {
+        InputStream inputStream;
+        FileOutputStream fileOutputStream = null;
+//        BufferedReader reader = null;
+//        BufferedWriter writer = null;
+        //需先创建目录--在创建文件
+        File dir = new File(getExternalCacheDir().getPath());
+        if( !dir.exists()){
+            dir.mkdirs();
+        }
+        File file = new File(dir , "download.apk");
+        int total = 0;
+        int count ;
+         /* 判断sd的外部设置状态是否可以读写 */
+        if (Environment.getExternalStorageState().equals(Environment.MEDIA_MOUNTED)) {
+            try {
+                fileOutputStream = new FileOutputStream(file);
 
-    }
-
-    /**
-     * 注册广播
-     */
-    private void registerBroadcast() {
-        /**注册service 广播 1.任务完成时 2.进行中的任务被点击*/
-        IntentFilter intentFilter = new IntentFilter();
-        intentFilter.addAction(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
-        registerReceiver(receiver, intentFilter);
-    }
-
-    /**
-     * 注销广播
-     */
-    private void unregisterBroadcast() {
-        if (receiver != null) {
-            unregisterReceiver(receiver);
-            receiver = null;
+                URL url = new URL("http://i.ahggwl.com/hytpay/hyt.apk");
+                URLConnection connection = url.openConnection();
+                connection.connect();
+                inputStream = connection.getInputStream();
+                mDownloadSize = connection.getContentLength();
+//                reader = new BufferedReader(new InputStreamReader(inputStream));
+//                writer = new BufferedWriter(new OutputStreamWriter(fileOutputStream));
+                byte[] buf = new byte[1024];
+                while ((count = inputStream.read(buf)) != -1) {
+                    total += count;
+                    fileOutputStream.write(buf,0,count);
+                    downLoadHandler.sendMessage(Message.obtain(downLoadHandler, 1, total));
+                }
+                inputStream.close();
+            } catch (MalformedURLException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            } finally {
+                try {
+                    if (fileOutputStream != null) {
+                        fileOutputStream.close();
+//                        writer.close();
+//                        reader.close();
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
         }
     }
 
-
-    private BroadcastReceiver receiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-
-        }
-    };
 
     @Override
     public void onDestroy() {
