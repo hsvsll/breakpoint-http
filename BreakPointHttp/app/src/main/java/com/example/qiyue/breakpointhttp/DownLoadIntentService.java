@@ -30,6 +30,7 @@ public class DownLoadIntentService extends IntentService {
     private int mDownloadSize;
     private int currSize;
     private int progress;
+    private Boolean mPause = false;
     public interface OnProgressListener {
         /**
          * 下载进度
@@ -108,10 +109,23 @@ public class DownLoadIntentService extends IntentService {
 //                reader = new BufferedReader(new InputStreamReader(inputStream));
 //                writer = new BufferedWriter(new OutputStreamWriter(fileOutputStream));
                 byte[] buf = new byte[1024];
+                // 定义UI刷新时间
+                long time = System.currentTimeMillis();
                 while ((count = inputStream.read(buf)) != -1) {
+//                    if(mPause){
+//                        return;
+//                    }
                     total += count;
                     fileOutputStream.write(buf,0,count);
-                    downLoadHandler.sendMessage(Message.obtain(downLoadHandler, 1, total));
+
+                    // 設置爲500毫米更新一次
+                    if (System.currentTimeMillis() - time > 500) {
+                        progress = (100 * total) / mDownloadSize;
+                        Intent intent = new Intent(BROADCAST_INTENT_FILTER);
+                        intent.putExtra(DOWNLOAD_PROGRESS,progress);
+                        sendBroadcast(intent);
+                    }
+//                    downLoadHandler.sendMessage(Message.obtain(downLoadHandler, 1, total));
                 }
                 inputStream.close();
             } catch (MalformedURLException e) {

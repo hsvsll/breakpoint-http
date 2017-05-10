@@ -31,6 +31,10 @@
         <service
             android:name=".DownloadService"
             android:enabled="true"
+            android:exported="true" />
+        <service
+            android:name=".BreakPointService"
+            android:enabled="true"
             android:exported="true"></service>
     </application>
 
